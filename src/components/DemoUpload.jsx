@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient';
 import { useState, useRef, useEffect } from 'react';
 import {
   Upload, Image as ImageIcon, Sparkles,
@@ -143,38 +143,40 @@ export default function DemoUpload({ onLaunchDashboard }) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
+  // Plugged-in Edge Function invocation (parse-statement) for uploads.
+  const handleFileUpload = async (fileOrEvent) => {
+    // Support both being called with a File directly and with an input event.
+    const file = fileOrEvent?.target?.files?.[0] ?? fileOrEvent;
     if (!file) return;
 
-    const isCsv = file.name.toLowerCase().endsWith('.csv');
-    if (isCsv) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target.result;
-        const parsed = parseCSV(text);
-        if (parsed.length === 0) {
-          setCsvError('No transactions could be parsed from this CSV. Try a different file.');
-          setExtractedData([]);
-        } else {
-          setCsvError('');
-          setExtractedData(parsed);
-          setScannedDone(true);
-          setIsScanning(false);
-        }
-      };
-      reader.readAsText(file);
-      return;
-    }
+    try {
+      // 1. Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert("Please sign in first to parse and save bank statements!");
+        return;
+      }
 
-    // Image/PDF: keep the current "AI Vision" simulation.
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const imgSrc = event.target.result;
-      setUploadedImage({ name: file.name, size: (file.size / 1024).toFixed(1) + ' KB', src: imgSrc });
-      startScanningProcess(null, imgSrc);
-    };
-    reader.readAsDataURL(file);
+      // 2. Prepare the file payload
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // 3. Call the Edge Function via Supabase SDK
+      const { data, error } = await supabase.functions.invoke('parse-statement', {
+        body: formData,
+      });
+
+      if (error) throw error;
+
+      alert(`Success! Saved ${data.count} transactions to your account.`);
+
+      // Optional: Call a prop function to refresh transactions in parent component/dashboard
+      // if (onUploadSuccess) onUploadSuccess(data.transactions);
+
+    } catch (err) {
+      console.error('Upload error:', err.message);
+      alert(`Upload failed: ${err.message}`);
+    }
   };
 
   const handleDrop = (e) => {
@@ -182,17 +184,7 @@ export default function DemoUpload({ onLaunchDashboard }) {
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.name.toLowerCase().endsWith('.csv')) {
-        handleFileUpload({ target: { files: [file] } });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imgSrc = event.target.result;
-        setUploadedImage({ name: file.name, size: (file.size / 1024).toFixed(1) + ' KB', src: imgSrc });
-        startScanningProcess(null, imgSrc);
-      };
-      reader.readAsDataURL(file);
+      handleFileUpload(file);
     }
   };
 
@@ -344,7 +336,7 @@ export default function DemoUpload({ onLaunchDashboard }) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png, image/jpeg, image/webp, text/csv, application/csv"
+                accept=".csv"
                 onChange={handleFileUpload}
                 className="hidden"
               />
