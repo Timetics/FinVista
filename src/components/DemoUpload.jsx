@@ -143,36 +143,82 @@ export default function DemoUpload({ onLaunchDashboard }) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Plugged-in Edge Function invocation (parse-statement) for uploads.
+  // Map a row returned by the parse-statement edge function (or loaded from
+  // Postgres) into the exact shape the dashboard expects.
+  const toAppTransaction = (row) => ({
+    id: Number(row.id),
+    date: row.date ?? null,
+    description: row.description ?? '',
+    category: row.category ?? '',
+    amount: Math.abs(Number(row.amount) || 0),
+    type: row.type ?? 'debit',
+    confidence: Number(row.confidence) || 0,
+    flags: Array.isArray(row.flags) ? row.flags : [],
+    source: row.source ?? 'csv',
+  });
+
+  // Image / PDF uploads use the local "AI Vision" simulation. The edge
+  // function only accepts CSV, so these never leave the browser.
+  const handleImageUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imgSrc = event.result;
+      setUploadedImage({ name: file.name, size: (file.size / 1024).toFixed(1) + ' KB', src: imgSrc });
+      startScanningProcess(null, imgSrc);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // CSV uploads are parsed and persisted server-side by the parse-statement
+  // edge function.
+  const handleCsvUpload = async (file) => {
+    // 1. The edge function stores rows against the caller's user id, so the
+    //    user has to be signed in.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert('Please sign in first to parse and save bank statements to your account.');
+      return;
+    }
+
+    // 2. Prepare the file payload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // 3. Call the Edge Function via Supabase SDK
+    const { data, error } = await supabase.functions.invoke('parse-statement', {
+      body: formData,
+    });
+
+    if (error) throw error;
+
+    // 4. Surface the parsed rows and refresh the dashboard with them.
+    const rows = (data?.transactions || []).map(toAppTransaction);
+    setExtractedData(rows);
+    setCsvError('');
+    setScannedDone(true);
+    setIsScanning(false);
+
+    alert(`Success! Saved ${data.count} transactions to your account.`);
+
+    if (rows.length > 0) {
+      onLaunchDashboard?.(rows);
+    }
+  };
+
   const handleFileUpload = async (fileOrEvent) => {
     // Support both being called with a File directly and with an input event.
     const file = fileOrEvent?.target?.files?.[0] ?? fileOrEvent;
     if (!file) return;
 
+    const isCsv = file.name.toLowerCase().endsWith('.csv');
+
+    if (!isCsv) {
+      handleImageUpload(file);
+      return;
+    }
+
     try {
-      // 1. Check if user is logged in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert("Please sign in first to parse and save bank statements!");
-        return;
-      }
-
-      // 2. Prepare the file payload
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // 3. Call the Edge Function via Supabase SDK
-      const { data, error } = await supabase.functions.invoke('parse-statement', {
-        body: formData,
-      });
-
-      if (error) throw error;
-
-      alert(`Success! Saved ${data.count} transactions to your account.`);
-
-      // Optional: Call a prop function to refresh transactions in parent component/dashboard
-      // if (onUploadSuccess) onUploadSuccess(data.transactions);
-
+      await handleCsvUpload(file);
     } catch (err) {
       console.error('Upload error:', err.message);
       alert(`Upload failed: ${err.message}`);
@@ -183,8 +229,7 @@ export default function DemoUpload({ onLaunchDashboard }) {
     e.preventDefault();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      handleFileUpload(file);
+      handleFileUpload(e.dataTransfer.files[0]);
     }
   };
 
@@ -524,6 +569,13 @@ export default function DemoUpload({ onLaunchDashboard }) {
                   <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Mock Scan (AI Vision) — simulated output</span>
                 </div>
+              </div>
+            )}
+
+            {/* Launch button -- available in both modes as soon as there is
+                data to analyse (mock scan, client-side CSV, or edge function). */}
+            {extractedData.length > 0 && (
+              <div className="pt-4 border-t border-slate-800 space-y-3">
                 <button
                   onClick={() => onLaunchDashboard(extractedData)}
                   disabled={!scannedDone || isScanning}

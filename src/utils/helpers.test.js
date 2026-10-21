@@ -8,6 +8,7 @@ import {
   getUnusualTransactions,
   formatCurrency,
   formatDate,
+  stableTransactionId,
 } from './helpers.js';
 
 describe('calculateTotals', () => {
@@ -169,6 +170,58 @@ describe('parseCSV', () => {
       'invalid,no-amount',
     ].join('\n');
     expect(parseCSV(csv)).toEqual([]);
+  });
+});
+
+describe('stableTransactionId', () => {
+  // These golden values were produced by the parse-statement edge function
+  // (supabase/functions/parse-statement/index.ts). The client-side and the
+  // server-side implementation MUST produce identical ids for the same row,
+  // otherwise the (user_id, id) upsert stops being idempotent and the same
+  // statement gets stored twice. If you change one implementation, change the
+  // other and update these values.
+  it('matches the edge function implementation', () => {
+    expect(stableTransactionId('2026-09-28', 'Salary Deposit - TechCorp Inc', 7500, 0)).toBe(8525743168);
+    expect(stableTransactionId('2026-09-27', 'Whole Foods Market #1042', 134.52, 0)).toBe(35354065793);
+    expect(stableTransactionId('2026-09-24', 'Starbucks Coffee', 6.75, 0)).toBe(26346066285);
+    expect(stableTransactionId('2026-09-24', 'Starbucks Coffee', 6.75, 1)).toBe(27189894104);
+    expect(stableTransactionId('', 'Unnamed Transaction', 0, 0)).toBe(62070898164);
+  });
+
+  it('is deterministic and always positive', () => {
+    const a = stableTransactionId('2026-09-28', 'Salary', 100, 0);
+    const b = stableTransactionId('2026-09-28', 'Salary', 100, 0);
+    expect(a).toBe(b);
+    expect(a).toBeGreaterThan(0);
+  });
+
+  it('stays inside the 36-bit range so it cannot collide with the id sequence', () => {
+    for (let i = 0; i < 500; i++) {
+      const id = stableTransactionId(`2026-09-28`, `Row ${i}`, i * 1.37, i);
+      expect(id).toBeGreaterThan(0);
+      expect(id).toBeLessThan(2 ** 36);
+      expect(Number.isSafeInteger(id)).toBe(true);
+    }
+  });
+
+  it('gives identical rows in one statement distinct ids', () => {
+    const parsed = parseCSV(
+      [
+        'Date,Description,Amount,Category',
+        '2026-09-24,Starbucks Coffee,-6.75,Dining',
+        '2026-09-24,Starbucks Coffee,-6.75,Dining',
+      ].join('\n')
+    );
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].id).not.toBe(parsed[1].id);
+  });
+
+  it('gives the same row the same id across separate parses', () => {
+    const csv = [
+      'Date,Description,Amount,Category',
+      '2026-09-24,Starbucks Coffee,-6.75,Dining',
+    ].join('\n');
+    expect(parseCSV(csv)[0].id).toBe(parseCSV(csv)[0].id);
   });
 });
 

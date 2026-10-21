@@ -53,6 +53,34 @@ describe('saveTransactions (unit, mocked supabase)', () => {
     upsertMock.mockResolvedValue({ error: new Error('boom') });
     await expect(saveTransactions([{ id: 1 }], 'user-123')).rejects.toThrow('boom');
   });
+
+  it('drops fields that do not exist as columns on the table', async () => {
+    // PostgREST rejects the whole request if the payload contains an unknown
+    // column, so unknown fields must be stripped before the upsert.
+    await saveTransactions(
+      [{ id: 7, description: 'Coffee', amount: 5, type: 'debit', not_a_column: 'x' }],
+      'user-123'
+    );
+    const [payload] = upsertMock.mock.calls[0];
+    expect(payload[0]).toEqual({
+      user_id: 'user-123',
+      id: 7,
+      description: 'Coffee',
+      amount: 5,
+      type: 'debit',
+    });
+    expect(payload[0]).not.toHaveProperty('not_a_column');
+  });
+
+  it('coerces amount to a number and flags to an array', async () => {
+    await saveTransactions(
+      [{ id: 8, amount: '12.34', flags: 'not-an-array' }],
+      'user-123'
+    );
+    const [payload] = upsertMock.mock.calls[0];
+    expect(payload[0].amount).toBe(12.34);
+    expect(payload[0].flags).toEqual([]);
+  });
 });
 
 describe('loadTransactions (unit, mocked supabase)', () => {
@@ -67,7 +95,48 @@ describe('loadTransactions (unit, mocked supabase)', () => {
     expect(fromMock).toHaveBeenCalledWith('transactions');
     expect(selectMock).toHaveBeenCalled();
     expect(eqMock).toHaveBeenCalledWith('user_id', 'user-123');
-    expect(loaded).toEqual([{ id: 1, user_id: 'user-123' }]);
+    expect(loaded).toEqual([
+      {
+        id: 1,
+        user_id: 'user-123',
+        date: null,
+        description: '',
+        category: '',
+        amount: 0,
+        type: 'debit',
+        confidence: 0,
+        flags: [],
+        source: 'csv',
+      },
+    ]);
+  });
+
+  it('normalizes raw database rows into the shape the UI expects', async () => {
+    eqMock.mockResolvedValue({
+      data: [
+        {
+          id: '42',
+          user_id: 'user-123',
+          date: '2026-09-28',
+          description: 'Salary Deposit',
+          category: 'Income',
+          amount: '7500.5',
+          type: 'credit',
+          confidence: '99',
+          flags: ['Recurring'],
+          source: 'csv',
+        },
+      ],
+      error: null,
+    });
+    const loaded = await loadTransactions('user-123');
+    expect(loaded[0]).toMatchObject({
+      id: 42,
+      amount: 7500.5,
+      type: 'credit',
+      confidence: 99,
+      flags: ['Recurring'],
+    });
   });
 
   it('returns [] when the query fails', async () => {

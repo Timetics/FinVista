@@ -189,6 +189,41 @@ export const calculateHealthScore = (transactions = []) => {
 };
 
 /**
+ * Deterministic 36-bit row id.
+ *
+ * The `transactions` table has a composite primary key of (user_id, id), and
+ * the upsert in src/lib/supabaseTransactions.js relies on `id` being stable so
+ * that re-scanning the same statement overwrites its rows instead of
+ * duplicating them. A content-derived id gives us that property.
+ *
+ * `occurrence` disambiguates genuinely distinct rows that happen to be
+ * identical (e.g. two $5 coffees on the same day) so they are not collapsed
+ * into one row.
+ *
+ * IMPORTANT: this MUST stay in sync with `stableTransactionId` in
+ * supabase/functions/parse-statement/index.ts so the client-side CSV path and
+ * the edge function derive the same id for the same logical row.
+ *
+ * The range is [1, 2^36) so it can never collide with the ids assigned by the
+ * `transactions_id_seq` sequence (which starts at 10^15).
+ */
+export const stableTransactionId = (date, description, amount, occurrence = 0) => {
+  const key = `${date ?? ''}|${description ?? ''}|${amount ?? 0}|${occurrence}`;
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i);
+    h1 ^= c;
+    h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 ^= c;
+    h2 = Math.imul(h2, 0x85ebca6b) >>> 0;
+  }
+  const high = h1 & 0x7fff;   // 15 bits
+  const low = h2 & 0x1fffff;  // 21 bits
+  return high * 0x200000 + low + 1; // 36 bits, always >= 1
+};
+
+/**
  * Robust CSV parser mapping bank statement columns to the app's internal transaction shape.
  * Accepts Date, Description, Amount (+/-), and Category-like columns.
  */
@@ -223,6 +258,10 @@ export const parseCSV = (csvString) => {
 
   const rows = hasHeader ? lines.slice(1) : lines;
   const transactions = [];
+  // Tracks how many times an identical (date, description, amount) row has been
+  // seen, so two identical transactions in one statement get distinct ids while
+  // a re-scan of the same statement reproduces the same ids.
+  const occurrenceCounts = new Map();
 
   rows.forEach((line, idx) => {
     const cells = line.split(',').map(c => c.trim());
@@ -262,7 +301,9 @@ export const parseCSV = (csvString) => {
     const isParenNegative = rawAmount.includes('(') && rawAmount.includes(')');
 
     // Parse numeric amount. Normalize parentheses before stripping symbols.
-    const cleaned = rawAmount.replace(/[()]/g, '').replace(/[^0-9.,\s-]/g, '');
+    // Thousands separators are removed explicitly -- otherwise parseFloat()
+    // stops at the first comma and turns "1,234.56" into 1.
+    const cleaned = rawAmount.replace(/[()]/g, '').replace(/,/g, '').replace(/[^0-9.\s+-]/g, '');
     let numericAmount = parseFloat(cleaned);
     if (isParenNegative && !isNaN(numericAmount)) {
       numericAmount = -Math.abs(numericAmount);
@@ -297,9 +338,18 @@ export const parseCSV = (csvString) => {
     // Default category fallback; leave blank so UI renders unknown if needed.
     category = category || '';
 
+    const finalDescription = description || 'Unnamed Transaction';
+
+    // Derive a deterministic id so the same logical row always maps to the same
+    // primary key, which is what makes the (user_id, id) upsert idempotent.
+    const dedupeKey = `${normalizedDate}|${finalDescription}|${displayAmount}`;
+    const occurrence = occurrenceCounts.get(dedupeKey) ?? 0;
+    occurrenceCounts.set(dedupeKey, occurrence + 1);
+
     transactions.push({
+      id: stableTransactionId(normalizedDate, finalDescription, displayAmount, occurrence),
       date: normalizedDate,
-      description: description || 'Unnamed Transaction',
+      description: finalDescription,
       amount: displayAmount,
       category: category || '',  // keep raw category; UI maps via colors
       type,
