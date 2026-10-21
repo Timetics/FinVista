@@ -15,7 +15,7 @@ const phases = [
     id: 'phase-1',
     phase: 'Phase 1',
     title: 'Foundation & Core Dashboard',
-    status: 'current',
+    status: 'done',
     timeline: 'Weeks 1–3',
     description: 'Core app structure, statement processing, and basic visualizations.',
     color: 'indigo',
@@ -35,25 +35,25 @@ const phases = [
       {
         name: 'Statement Import & Dropzone',
         icon: Upload,
-        status: 'planned',
+        status: 'done',
         details: 'Drag & drop file zone supporting CSV/PDF. File validation, progress indicator, parse status ("AI Parsing... 142 transactions mapped"). Demo mode with sample data loader.',
       },
       {
         name: 'CSV/PDF Parser Engine',
         icon: FileText,
-        status: 'planned',
+        status: 'done',
         details: 'Client-side CSV parsing (Papa Parse). PDF text extraction (pdf.js). Column auto-detection for Date, Description, Amount. Multi-bank format support.',
       },
       {
         name: 'Transaction Data Store',
         icon: Database,
-        status: 'planned',
+        status: 'done',
         details: 'React context/state for global transaction data. Computed values: totals, categories, date ranges. LocalStorage persistence for session continuity.',
       },
       {
         name: 'Summary Metrics Cards',
         icon: BarChart3,
-        status: 'planned',
+        status: 'done',
         details: 'Net Balance (with % change vs previous period). Total Income vs Expenses. Savings Rate percentage. AI Health Score (0–100 dynamic badge). Animated counters & sparkline previews.',
       },
     ],
@@ -311,9 +311,16 @@ export default function RoadmapSection() {
             <span className="gradient-text">personal finance</span>
           </h2>
           <p className="text-lg text-slate-400 leading-relaxed">
-            A detailed component map of every feature being built. Each phase includes 
+            A detailed component map of every feature being built. Each phase includes
             specific components with implementation details.
           </p>
+
+          <div className="mt-6 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Checkpoint 2 complete: upload flow, OCR parsing, transaction state, and KPI cards are live.</span>
+            </div>
+          </div>
 
           {/* Progress bar */}
           <div className="mt-8 max-w-md mx-auto">
@@ -334,7 +341,8 @@ export default function RoadmapSection() {
         <div className="space-y-6">
           {phases.map((phase, pi) => {
             const colors = phaseColors[phase.color];
-            const status = statusConfig[phase.status];
+            const phaseComplete = phase.components.every(component => component.status === 'done');
+            const status = statusConfig[phaseComplete ? 'done' : phase.status];
             const isExpanded = expandedPhase === phase.id;
             const doneInPhase = phase.components.filter(c => c.status === 'done').length;
 
