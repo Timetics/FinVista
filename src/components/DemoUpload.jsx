@@ -579,7 +579,7 @@ export default function DemoUpload({ onLaunchDashboard }) {
                 <button
                   onClick={() => onLaunchDashboard(extractedData)}
                   disabled={!scannedDone || isScanning}
-                  className="btn-primary w-full !py-3.5 flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-indigo-500/25 group"
+                  className="btn-primary w-full !py-3.5 flex items-center justify-center gap-2 text-sm font-bold group"
                 >
                   <Sparkles className="w-4.5 h-4.5 text-white group-hover:rotate-12 transition-transform" />
                   <span>Analyze in FinVista AI Dashboard</span>

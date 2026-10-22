@@ -55,11 +55,11 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
                   disabled={isRoadmap}
                   onClick={isRoadmap ? undefined : () => onNavigate?.(link.id)}
                   title={isRoadmap ? 'Coming soon — work in progress' : undefined}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 inline-flex items-center gap-1.5 ${
+                  className={`pill px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5 ${
                     isRoadmap
                       ? 'text-slate-600 cursor-not-allowed'
                       : activeSection === link.id
-                        ? 'text-white bg-slate-800/60'
+                        ? 'text-white bg-slate-800/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                   }`}
                 >
@@ -72,12 +72,12 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
 
           {/* Right side View Switcher & Action Button */}
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1">
+            <div className="hidden sm:flex items-center bg-slate-900/80 border border-slate-800 rounded-full p-1">
               <button
                 onClick={() => onToggleView?.('homepage')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                className={`pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
                   viewMode === 'homepage'
-                    ? 'bg-slate-800 text-white shadow-sm'
+                    ? 'bg-slate-800 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -86,9 +86,9 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
               </button>
               <button
                 onClick={() => onNavigate?.('demo-upload')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                className={`pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
                   viewMode === 'demo-upload'
-                    ? 'bg-cyan-600 text-white shadow-sm'
+                    ? 'bg-cyan-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -97,9 +97,9 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
               </button>
               <button
                 onClick={() => onToggleView?.('dashboard')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                className={`pill px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 ${
                   viewMode === 'dashboard'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -129,11 +129,11 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
               <button
                 onClick={onSignOut}
                 disabled={signingOut}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                className="btn-ghost hidden sm:flex items-center gap-2"
                 title={user.email ? `Signed in as ${user.email} — sign out` : 'Sign Out'}
               >
                 {user.email && (
-                  <span className="hidden lg:inline max-w-[180px] truncate text-xs text-slate-500">
+                  <span className="hidden lg:inline max-w-[180px] truncate text-xs opacity-70">
                     {user.email}
                   </span>
                 )}
@@ -167,11 +167,11 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
                 disabled={isRoadmap}
                 onClick={isRoadmap ? undefined : () => { onNavigate?.(link.id); setMobileOpen(false); }}
                 title={isRoadmap ? 'Coming soon — work in progress' : undefined}
-                className={`block w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                className={`pill block w-full text-left px-4 py-3 text-sm font-medium ${
                   isRoadmap
                     ? 'text-slate-600 cursor-not-allowed'
                     : activeSection === link.id
-                      ? 'text-white bg-slate-800/60'
+                      ? 'text-white bg-slate-800/70'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
                 }`}
               >
@@ -201,7 +201,7 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
             <button
               onClick={() => { onSignOut?.(); setMobileOpen(false); }}
               disabled={signingOut}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+              className="btn-ghost w-full flex items-center justify-center gap-2 mt-2"
             >
               <LogOut className="w-4 h-4" />
               <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
