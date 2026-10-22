@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "test": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "screenshot": "node scripts/screenshot.mjs",
+    "screenshot:live": "node scripts/screenshot.mjs --url https://fin-vista-chi.vercel.app --out shots/production.png --wait 6000"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

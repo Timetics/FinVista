@@ -49,3 +49,7 @@ supabase/.temp/
 .env*
 # ...but keep the committed template
 !.env.example
+
+# Screenshots
+shots/
+screenshot.png

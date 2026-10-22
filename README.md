@@ -158,6 +158,36 @@ caching for hashed assets under `/assets/`, and security headers (CSP, HSTS,
 The CSP allows the Supabase API (`https://*.supabase.co`), Google Fonts and the
 Unsplash images used by the demo statement photos.
 
+### Screenshots
+
+`scripts/screenshot.mjs` captures the app for visual review. It renders with
+**headless Microsoft Edge** for local URLs, and with a server-side browser for
+public URLs.
+
+```bash
+npm run preview                      # in one terminal
+npm run screenshot                   # local, -> screenshot.png
+npm run screenshot -- --out shots/home.png --width 1440 --height 900
+npm run screenshot:live              # production, -> shots/production.png
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--url` | `http://localhost:4173/` | page to capture |
+| `--out` | `screenshot.png` | output path |
+| `--width` / `--height` | `1440` / `900` | viewport |
+| `--wait` | `3000` | ms to let the page settle before capturing |
+
+> **Why public URLs go through a proxy.** This machine's egress resets the TLS
+> handshake for `*.vercel.app` before the ClientHello completes. It is an SNI
+> filter rather than an IP filter — forcing `api.vercel.com` onto the same IP
+> works, while forcing `fin-vista-chi.vercel.app` onto a working IP still
+> fails. A server-side browser sidesteps the local filter entirely.
+>
+> Avoid services that freeze CSS animations (thum.io does): FinVista's
+> `animate-fade-up` starts at `opacity: 0`, so a frozen animation leaves the
+> hero invisible.
+
 ## Testing
 
 ```bash
