@@ -10,17 +10,36 @@ import Footer from './components/Footer';
 import AuthPage from './components/AuthPage';
 import { sampleTransactions } from './data/sampleData';
 import { loadTransactions, saveTransactions } from './lib/supabaseTransactions';
+import { visibleRows } from './lib/sessionScope';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { signOut } from './lib/supabaseAuth';
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, signOut, signingOut } = useAuth();
   const [activeSection, setActiveSection] = useState('hero');
   const [viewMode, setViewMode] = useState('homepage'); // 'homepage' | 'roadmap' | 'dashboard' | 'demo-upload'
-  const [hasData, setHasData] = useState(false);
-  const [transactions, setTransactions] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [rowsOwner, setRowsOwner] = useState(null);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
+
+  // The rows on screen always belong to a specific account. `rowsOwner`
+  // records which one (`null` = rows produced in an anonymous session, e.g.
+  // the built-in sample data).
+  //
+  // Deriving the visible rows from the current session means there is never a
+  // moment where the state and the session disagree -- signing out explicitly,
+  // an expired or revoked session, or signing out in another tab all hide the
+  // previous user's financial data immediately.
+  const currentOwner = user?.id ?? null;
+  const transactions = visibleRows(rows, rowsOwner, currentOwner);
+  const hasData = transactions.length > 0;
+
+  // Replace the rows on screen, tagged as belonging to the account that is
+  // signed in right now.
+  const applyTransactions = useCallback((nextRows) => {
+    setRows(nextRows);
+    setRowsOwner(currentOwner);
+  }, [currentOwner]);
 
   // Close auth modals once the user is authenticated
   useEffect(() => {
@@ -30,15 +49,22 @@ function AppContent() {
     }
   }, [user]);
 
-  // Load any previously saved transactions from Supabase on mount
+  // Load any previously saved transactions from Supabase.
   useEffect(() => {
     if (!user) return;
+
+    let cancelled = false;
     loadTransactions(user.id).then((saved) => {
+      if (cancelled) return;
       if (saved.length > 0) {
-        setTransactions(saved);
-        setHasData(true);
+        setRows(saved);
+        setRowsOwner(user.id);
       }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   // Track active section on scroll if in homepage mode
@@ -81,8 +107,7 @@ function AppContent() {
 
     if (sectionId === 'dashboard') {
       if (!hasData) {
-        setTransactions(sampleTransactions);
-        setHasData(true);
+        applyTransactions(sampleTransactions);
         saveTransactions(sampleTransactions, user?.id).catch((err) =>
           console.error('[supabase] sample save failed:', err)
         );
@@ -99,35 +124,38 @@ function AppContent() {
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
-  }, [hasData, user?.id]);
+  }, [hasData, user?.id, applyTransactions]);
 
   const handleLoadSample = useCallback(() => {
-    setTransactions(sampleTransactions);
-    setHasData(true);
+    applyTransactions(sampleTransactions);
     setViewMode('dashboard');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     saveTransactions(sampleTransactions, user?.id).catch((err) =>
       console.error('[supabase] sample save failed:', err)
     );
-  }, [user?.id]);
+  }, [user?.id, applyTransactions]);
 
   const handleLaunchDashboardFromScan = useCallback(async (scannedTransactions) => {
-    setTransactions(scannedTransactions);
-    setHasData(true);
+    applyTransactions(scannedTransactions);
     setViewMode('dashboard');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     saveTransactions(scannedTransactions, user?.id).catch((err) =>
       console.error('[supabase] scan save failed:', err)
     );
-  }, [user?.id]);
+  }, [user?.id, applyTransactions]);
 
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
+      // The signed-out user's rows are no longer derived as visible, so the
+      // dashboard is empty again. Drop back to the landing page so the user is
+      // not left looking at an empty shell.
+      setViewMode('homepage');
+      setActiveSection('hero');
     } catch (err) {
       console.error('[auth] sign-out failed:', err);
     }
-  }, []);
+  }, [signOut]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
@@ -138,6 +166,7 @@ function AppContent() {
         viewMode={viewMode}
         user={user}
         onSignOut={handleSignOut}
+        signingOut={signingOut}
         onSignIn={() => setShowSignIn(true)}
         onToggleView={(mode) => {
           if (mode === 'dashboard' && !hasData) {

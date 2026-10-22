@@ -4,7 +4,7 @@ import {
   Sparkles, LayoutDashboard, Home, Scan, LogOut, Clock
 } from 'lucide-react';
 
-export default function Navbar({ hasData, onNavigate, activeSection, viewMode, onToggleView, user, onSignOut, onSignIn }) {
+export default function Navbar({ hasData, onNavigate, activeSection, viewMode, onToggleView, user, onSignOut, onSignIn, signingOut = false }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -128,11 +128,17 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
             {user && (
               <button
                 onClick={onSignOut}
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all"
-                title="Sign Out"
+                disabled={signingOut}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                title={user.email ? `Signed in as ${user.email} — sign out` : 'Sign Out'}
               >
+                {user.email && (
+                  <span className="hidden lg:inline max-w-[180px] truncate text-xs text-slate-500">
+                    {user.email}
+                  </span>
+                )}
                 <LogOut className="w-4 h-4" />
-                <span className="hidden md:inline">Sign Out</span>
+                <span className="hidden md:inline">{signingOut ? 'Signing out...' : 'Sign Out'}</span>
               </button>
             )}
 
@@ -191,6 +197,16 @@ export default function Navbar({ hasData, onNavigate, activeSection, viewMode, o
             <LayoutDashboard className="w-4 h-4" />
             Open Live Dashboard
           </button>
+          {user && (
+            <button
+              onClick={() => { onSignOut?.(); setMobileOpen(false); }}
+              disabled={signingOut}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all mt-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+            </button>
+          )}
         </div>
       </div>
     </nav>
