@@ -106,6 +106,58 @@ Every read and write is therefore scoped to the caller's own rows.
 | `npm run lint` | Oxlint |
 | `npm test` | Vitest (watch mode; use `npm test -- --run` for a single pass) |
 
+## Deployment (Vercel)
+
+The frontend is deployed to Vercel and connected to the GitHub repository, so
+**every push to `main` deploys automatically**.
+
+| | |
+|---|---|
+| Vercel project | `timetics-projects/fin-vista` |
+| Production URL | `https://fin-vista-chi.vercel.app` |
+| GitHub repo | `Timetics/FinVista` (branch `main` → production) |
+| Framework preset | Vite (`buildCommand: npm run build`, `outputDirectory: dist`) |
+| Node version | 24.x |
+
+### Environment variables (set in the Vercel project)
+
+| Variable | Value |
+|---|---|
+| `VITE_SUPABASE_URL` | `https://ldmlhtqqueoilzigasbm.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | the project's **publishable** key |
+
+Both are set for **Production**, **Preview** and **Development**. Only these two
+are needed — the backend is Supabase (Postgres + GoTrue auth + the
+`parse-statement` edge function), and the publishable key is safe to ship in the
+browser because access is controlled by Row Level Security.
+
+> The project previously carried a full set of `SUPABASE_*` / `POSTGRES_*` / `NEXT_PUBLIC_*`
+> variables (including a service-role key and the database password) pointing at a
+> Supabase project that has since been deleted. They were removed. Do not add
+> service-role or database credentials to this project — a Vercel build only ever
+> needs the two `VITE_` variables above.
+
+### Working with the deployment locally
+
+```bash
+vercel link --project fin-vista --scope timetics-projects   # links .vercel/project.json
+vercel env pull .env.local --environment=development --yes   # pulls the remote vars
+vercel --prod                                            # one-off production deploy
+vercel logs fin-vista                                     # tail production logs
+```
+
+`vercel link` writes to `.env.local` and may overwrite local values — re-check
+it after linking.
+
+### `vercel.json`
+
+Declares the Vite build explicitly, adds an SPA fallback rewrite, immutable
+caching for hashed assets under `/assets/`, and security headers (CSP, HSTS,
+`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`).
+
+The CSP allows the Supabase API (`https://*.supabase.co`), Google Fonts and the
+Unsplash images used by the demo statement photos.
+
 ## Testing
 
 ```bash

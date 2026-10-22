@@ -34,8 +34,18 @@ dist/
 dist-ssr/
 *.local
 
+# Vercel
+.vercel
+
 # IDE & Tool caches
 .agents/
 .freebuff/
 .vscode/
 supabase/.temp/
+
+# Vercel
+.vercel/
+.vercel
+.env*
+# ...but keep the committed template
+!.env.example
